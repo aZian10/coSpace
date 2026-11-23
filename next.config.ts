@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "**.unsplash.com",
       },
+      {
+        protocol: "https",
+        hostname: "cospace-media-prod-2026-542649934561-us-east-2-an.s3.us-east-2.amazonaws.com",
+        pathname: "/**",
+      },
     ],
   },
   turbopack: {

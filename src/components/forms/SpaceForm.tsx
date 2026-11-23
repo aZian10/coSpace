@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { SpaceType } from '@prisma/client';
 import { useI18n } from '@/lib/i18n/I18nContext';
-import { Building, X, Save, AlertCircle } from 'lucide-react';
+import { Building, X, Save, AlertCircle, Upload, Loader2 } from 'lucide-react';
 
 interface SpaceFormProps {
   initialData?: {
@@ -42,8 +42,41 @@ export const SpaceForm: React.FC<SpaceFormProps> = ({
   const [amenitiesString, setAmenitiesString] = useState<string>(
     initialData?.amenities.join(', ') || 'WiFi 6, Enchufes, Café ilimitado'
   );
+  const [uploading, setUploading] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setError(null);
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folder', 'spaces');
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Error al subir la imagen a S3');
+        setUploading(false);
+        return;
+      }
+
+      setImageUrl(data.url);
+    } catch {
+      setError('Error de conexión al subir la imagen.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -194,13 +227,43 @@ export const SpaceForm: React.FC<SpaceFormProps> = ({
             <label className="block text-xs font-medium text-slate-300 mb-1">
               {t('form.spaceImage')}
             </label>
-            <input
-              type="url"
-              required
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              className="w-full liquid-glass-input px-3.5 py-2.5 rounded-xl text-xs font-mono"
-            />
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-dashed border-cyan-400/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-medium cursor-pointer transition-colors">
+                {uploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Subiendo imagen a S3...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    <span>Subir imagen desde el equipo (JPG, PNG, WEBP, AVIF - máx 5 MB)</span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif"
+                  disabled={uploading}
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+              <input
+                type="url"
+                required
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full liquid-glass-input px-3.5 py-2.5 rounded-xl text-xs font-mono"
+              />
+              {imageUrl && (
+                <img
+                  src={imageUrl}
+                  alt="Vista previa del espacio"
+                  className="w-full h-28 object-cover rounded-xl border border-white/10"
+                />
+              )}
+            </div>
           </div>
 
           <div>
@@ -239,8 +302,8 @@ export const SpaceForm: React.FC<SpaceFormProps> = ({
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="liquid-glass-btn px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg shadow-cyan-500/25 flex items-center gap-2"
+              disabled={loading || uploading}
+              className="liquid-glass-btn px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg shadow-cyan-500/25 flex items-center gap-2 disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
               <span>{loading ? 'Guardando...' : t('form.save')}</span>
